@@ -1,1 +1,27 @@
-<app-readings-table></app-readings-table>
+<!-- top toolbar stays the same -->
+
+<div class="container">
+  <!-- Tab nav needs a panel now -->
+  <nav mat-tab-nav-bar [tabPanel]="tabPanel" mat-align-tabs="start">
+    <a mat-tab-link
+       routerLink="/readings"
+       routerLinkActive #rla1="routerLinkActive"
+       [active]="rla1.isActive">
+      Sensor Readings
+    </a>
+
+    <a mat-tab-link
+       routerLink="/devices"
+       routerLinkActive #rla2="routerLinkActive"
+       [active]="rla2.isActive">
+      Device Management
+    </a>
+  </nav>
+
+  <!-- This panel satisfies the new requirement -->
+  <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+
+  <main style="padding:16px 0 32px;">
+    <router-outlet></router-outlet>
+  </main>
+</div>

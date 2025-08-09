@@ -12,7 +12,7 @@
     "electron:dev": "concurrently \"ng serve\" \"wait-on http://localhost:4200 && electron . --dev\"",
     "dist": "npm run build && electron-builder"
   },
-   "build": {
+  "build": {
     "appId": "com.example.sensordashboard",
     "asar": true,
     "files": [
@@ -23,7 +23,7 @@
       "buildResources": "build"
     },
     "win": {
-      "target": "nsis"          
+      "target": "nsis"
     }
   },
   "prettier": {
@@ -39,12 +39,12 @@
   "private": true,
   "dependencies": {
     "@angular/animations": "^20.1.4",
-    "@angular/cdk": "^20.1.4",
+    "@angular/cdk": "^20.1.5",
     "@angular/common": "^20.1.0",
     "@angular/compiler": "^20.1.0",
     "@angular/core": "^20.1.0",
     "@angular/forms": "^20.1.0",
-    "@angular/material": "^20.1.4",
+    "@angular/material": "^20.1.5",
     "@angular/platform-browser": "^20.1.0",
     "@angular/router": "^20.1.0",
     "rxjs": "~7.8.0",

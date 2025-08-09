@@ -1,0 +1,5 @@
+/* keep minimal; theme handles most styling */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 10px; }
+thead tr { border-bottom: 1px solid rgba(0,0,0,0.1); }
+tbody tr { border-bottom: 1px solid rgba(0,0,0,0.06); }

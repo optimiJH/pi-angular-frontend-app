@@ -17,7 +17,6 @@ import { Observable, startWith } from 'rxjs';
   /* 👉 NO NgForOf here, but we do add DecimalPipe */
   imports: [MatTableModule, AsyncPipe, DatePipe, DecimalPipe],
   template: `
-    <h1 class="title">Sensor Readings</h1>
 
     <!-- (data$ | async)!  : non-null assertion keeps mat-table happy -->
     <table mat-table [dataSource]="(data$ | async)!">
