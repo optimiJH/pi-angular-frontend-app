@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-const API = 'http://localhost:5005'; // change to your LAN URL if needed
+// TODO: if you already have an environment, swap API to environment.api
+const API = 'http://localhost:5005';
 
 export type DeviceStatus = 'Online'|'Stale'|'Offline'|'Blocked'|number;
 
@@ -23,5 +24,25 @@ export class DevicesService {
 
   command(id: string, type: 'reboot'|'update'|'run_script', payload: any = {}) {
     return this.http.post<{commandId:string; status:string}>(`${API}/api/devices/${id}/commands`, { type, payload });
+  }
+
+  // NEW
+  invite() {
+    return this.http.post<{enrollmentKey: string; expiresAt: string}>(`${API}/api/devices/invites`, {});
+  }
+
+  // NEW
+  remove(id: string) {
+    return this.http.delete(`${API}/api/devices/${id}`);
+  }
+
+  // NEW
+  block(id: string) {
+    return this.http.post(`${API}/api/devices/${id}/block`, {});
+  }
+
+  // NEW
+  unblock(id: string) {
+    return this.http.post(`${API}/api/devices/${id}/unblock`, {});
   }
 }
