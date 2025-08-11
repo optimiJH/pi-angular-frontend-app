@@ -47,6 +47,8 @@
     "@angular/material": "^20.1.5",
     "@angular/platform-browser": "^20.1.0",
     "@angular/router": "^20.1.0",
+    "echarts": "^6.0.0",
+    "ngx-echarts": "^20.0.2",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
@@ -67,6 +69,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "multicast-dns": "^7.2.5",
+    "node-ssh": "^13.2.1",
     "typescript": "~5.8.2",
     "wait-on": "^8.0.4"
   }

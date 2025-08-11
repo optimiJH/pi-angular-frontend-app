@@ -9,12 +9,31 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Clipboard } from '@angular/cdk/clipboard';
 
+interface MdnsEntry {
+  host: string;
+  addresses?: string[];           // IPv4/IPv6 strings
+  port?: number;
+  meta?: Record<string, string>;  // from TXT records
+  lastSeen?: number;
+}
+
 /** --- Electron bridge --- */
 declare global {
   interface Window {
     discover?: {
       list: () => Promise<any[]>;
       onSnapshot: (handler: (p: { at: number; count: number; list: any[] }) => void) => () => void;
+    };
+    // deploy bridge exposed by electron/preload.js
+    deploy?: {
+      run: (params: {
+        ip: string;
+        host?: string;
+        inviteKey: string;
+        serverBase: string;
+        user?: string;
+        password?: string;
+      }) => Promise<{ ok: boolean; logs?: string[] }>;
     };
   }
 }
@@ -78,6 +97,9 @@ class ElectronService {
                 <mat-icon>terminal</mat-icon> Run Script
               </button>
 
+            <button mat-stroked-button (click)="startReport(d, 60)">Report data</button>
+            <button mat-stroked-button (click)="stopReport(d)">Stop report data</button>
+
               <button mat-stroked-button (click)="toggleBlock(d)" [color]="isBlocked(d) ? 'accent' : undefined" matTooltip="Block prevents connecting">
                 <mat-icon>{{ isBlocked(d) ? 'lock_open' : 'block' }}</mat-icon>
                 {{ isBlocked(d) ? 'Unblock' : 'Block' }}
@@ -113,20 +135,21 @@ class ElectronService {
               <td>{{ x.host }}</td>
               <td>{{ x.addresses?.[0] || '—' }}</td>
               <td>{{ x.port }}</td>
-              <td>{{ x.meta?.model || x.meta?.name || '—' }}</td>
+              <td>{{ x.meta?.['model'] || x.meta?.['name'] || '—' }}</td>
               <td style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button mat-stroked-button (click)="inviteAndShowKey()">
                   <mat-icon>key</mat-icon> Invite
                 </button>
-                <button mat-stroked-button color="primary" (click)="deployStub(x)">
-                  <mat-icon>cloud_upload</mat-icon> Deploy (stub)
+                <!-- CHANGED: call real deploy() instead of deployStub() -->
+                <button mat-stroked-button color="primary" (click)="deploy(x)">
+                  <mat-icon>cloud_upload</mat-icon> Deploy
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
 
-        <!-- DEBUG PANEL -->
+        <!-- DEBUG PANEL (kept disabled) -->
         <div *ngIf="false" style="margin-top:12px; padding:10px; border-radius:8px; background: var(--mat-sys-surface-container-high);">
           <strong>Debug:</strong>
           <div>isElectron: {{ isElectron }}</div>
@@ -159,7 +182,7 @@ export class DevicesComponent {
   inviteExpiry = signal<string | null>(null);
 
   // mDNS discovered entries
-  discovered = signal<any[]>([]);
+  discovered = signal<MdnsEntry []>([]);
   get isElectron() { return this.electron.isElectron; }
 
   // Debug signals
@@ -214,6 +237,21 @@ export class DevicesComponent {
   update(d: Device){ this.api.command(d.id,'update',{version:'1.0.0'}).subscribe({ next:_=>this.toast.set(`Update queued on ${d.name}`) }); }
   runScript(d: Device){ this.api.command(d.id,'run_script',{scriptId:'collect-logs',args:{minutes:30}}).subscribe({ next:_=>this.toast.set(`Script queued on ${d.name}`) }); }
 
+  startReport(d: Device, periodSeconds = 60) {
+    this.api.command(d.id, 'start_report', { periodSeconds }).subscribe({
+      next: () => console.log(`Reporting started on ${d.name} (${periodSeconds}s)`),
+      error: (e) => console.error('Start report failed:', e)
+    });
+  }
+
+  stopReport(d: Device) {
+    this.api.command(d.id, 'stop_report', {}).subscribe({
+      next: () => console.log(`Reporting stopped on ${d.name}`),
+      error: (e) => console.error('Stop report failed:', e)
+    });
+  }
+
+ 
   remove(d: Device){
     this.api.remove(d.id).subscribe({
       next: _ => { this.toast.set(`Removed ${d.name}`); this.refresh(); },
@@ -241,8 +279,40 @@ export class DevicesComponent {
 
   inviteAndShowKey(){ this.createInvite(); }
 
-  deployStub(x: any) {
-    this.toast.set(`Would deploy to ${x.host} (${x.addresses?.[0] || 'no IP'})`);
+  // NEW: real deploy
+  async deploy(x: MdnsEntry) {
+    if (!this.isElectron || !window.deploy?.run) {
+      this.toast.set('Deploy is only available in the desktop app');
+      return;
+    }
+    const ipv4Re = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+    const addrs: string[] = Array.isArray(x.addresses) ? x.addresses : [];
+    const ip = addrs.find((addr: string) => ipv4Re.test(addr)) ?? addrs[0];
+
+    if (!ip) { this.toast.set('No IPv4 address found for this host'); return; }
+
+    // 1) Create a one-time invite key
+    const invite = await new Promise<{enrollmentKey: string, expiresAt?: string}>((resolve, reject) =>
+      this.api.invite().subscribe({ next: resolve, error: reject })
+    );
+
+    // 2) Ask Electron to SCP + install with that key
+    const serverBase = 'http://localhost:5005'; // TODO: pull from environment if you have one
+    this.toast.set(`Deploying to ${ip}…`);
+    try {
+      await window.deploy.run({
+        ip,
+        host: x.host,
+        inviteKey: invite.enrollmentKey,
+        serverBase,
+        user: 'jackwu',
+        password: 'nowhere'
+      });
+      this.toast.set('Deploy OK — waiting for agent heartbeat…');
+      setTimeout(() => this.refresh(), 4000);
+    } catch (e: any) {
+      this.toast.set(`Deploy failed: ${e?.message || e}`);
+    }
   }
 
   copy(text: string){ this.clipboard.copy(text); this.toast.set('Copied invite key'); }

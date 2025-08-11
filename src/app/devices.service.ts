@@ -22,8 +22,16 @@ export class DevicesService {
     return this.http.get<Device[]>(`${API}/api/devices`);
   }
 
-  command(id: string, type: 'reboot'|'update'|'run_script', payload: any = {}) {
+  command(id: string, type: 'reboot'|'update'|'run_script'|'start_report'|'stop_report', payload: any = {}) {
     return this.http.post<{commandId:string; status:string}>(`${API}/api/devices/${id}/commands`, { type, payload });
+  }
+
+  startReport(id: string, periodSeconds = 60) {
+    return this.command(id, 'start_report', { periodSeconds });
+  }
+
+  stopReport(id: string) {
+    return this.command(id, 'stop_report', {});
   }
 
   // NEW

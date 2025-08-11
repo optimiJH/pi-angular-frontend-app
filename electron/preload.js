@@ -11,3 +11,7 @@ contextBridge.exposeInMainWorld('discover', {
     return () => ipcRenderer.off('discover:snapshot', wrapped);
   }
 });
+
+contextBridge.exposeInMainWorld('deploy', {
+  run: (params) => ipcRenderer.invoke('deploy:run', params)
+});
