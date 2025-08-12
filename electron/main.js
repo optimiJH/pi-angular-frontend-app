@@ -161,6 +161,7 @@ ipcMain.handle('deploy:run', async (_evt, params) => {
 
     // Run installer
     logd('installing agent');
+    await ssh.execCommand('sudo systemctl stop device-agent || true');
     const { stdout, stderr } = await ssh.execCommand('cd ~/pi-agent-tmp && sudo bash ./install.sh');
     if (stdout) logd(stdout);
     if (stderr) logd(stderr);
