@@ -1,6 +1,6 @@
 // src/app/telemetry.component.ts
 import { Component, DestroyRef, inject, signal } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { NgxEchartsDirective, provideEchartsCore } from 'ngx-echarts';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -10,7 +10,7 @@ type Row = { timestamp: number; temperature: number };
 @Component({
   selector: 'app-telemetry',
   standalone: true,
-  imports: [CommonModule, DatePipe, NgxEchartsDirective, MatProgressBarModule],
+  imports: [CommonModule, NgxEchartsDirective, MatProgressBarModule],
   providers: [provideEchartsCore({ echarts: () => import('echarts') })],
   template: `
     <div class="page-title">Live Telemetry</div>

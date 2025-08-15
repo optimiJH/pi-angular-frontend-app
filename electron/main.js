@@ -101,13 +101,29 @@ ipcMain.handle('discover:list', async () => discovery.list());
 
 /** ----------------- DEPLOY: copy agent_bundle to Pi and run installer ----------------- */
 ipcMain.handle('deploy:run', async (_evt, params) => {
-  const { ip, host, inviteKey, serverBase, user = 'jackwu', password = 'nowhere' } = params || {};
+  const {
+    ip, host, inviteKey, serverBase,
+    user,                      // renderer may still send "pi"
+    password,                  // MUST be the real password; no placeholder
+    privateKeyPath,            // optional: if you want key auth
+    passphrase                 // optional: passphrase for key
+  } = params || {};
   if (!ip) throw new Error('Missing ip');
   if (!inviteKey) throw new Error('Missing inviteKey');
 
+  // Use renderer user if present, fallback to jackwu
+  const loginUser = (user && user.trim()) || 'jackwu';
+
+  // Require a real password if no key provided
+  const effectivePassword = (password ?? '').toString();
+  if (!privateKeyPath && !effectivePassword) {
+    throw new Error(`SSH password missing for ${loginUser}. Enter the actual Pi password.`);
+  }
+
   // Derive SERVER_BASE automatically (prefer same /24 as the Pi)
   const localIPv4 = pickLocalIPv4ForPeer(ip);
-  let serverBaseEffective = serverBase && /^https?:\/\//i.test(serverBase) ? serverBase : `http://${localIPv4}:5005`;
+  let serverBaseEffective =
+    serverBase && /^https?:\/\//i.test(serverBase) ? serverBase : `http://${localIPv4}:5005`;
   if (/localhost|127\.0\.0\.1/i.test(serverBaseEffective)) {
     serverBaseEffective = `http://${localIPv4}:5005`;
   }
@@ -138,14 +154,44 @@ ipcMain.handle('deploy:run', async (_evt, params) => {
   const logd = (...a) => { const s = a.join(' '); logs.push(s); console.log('[deploy]', s); };
 
   try {
-    logd('connecting', `${user}@${ip}`);
-    await ssh.connect({ host: ip, username: user, password, tryKeyboard: true });
+    logd('params', JSON.stringify({
+      ip, host,
+      paramUser: user,
+      usingUser: loginUser,
+      hasPassword: !!effectivePassword,
+      hasKey: !!privateKeyPath,
+      agent: !!process.env.SSH_AUTH_SOCK
+    }));
+
+    // Build a connection object that works with password and keyboard-interactive
+    const conn = {
+      host: ip,
+      username: loginUser,
+      readyTimeout: 25000,
+      tryKeyboard: true,
+      onKeyboardInteractive: (_name, _instructions, _lang, prompts, finish) => {
+        // many Pis use keyboard-interactive (PAM) prompts — answer with the same password
+        finish(prompts.map(() => effectivePassword));
+      }
+    };
+    if (privateKeyPath && fs.existsSync(privateKeyPath)) {
+      conn.privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+      if (passphrase) conn.passphrase = passphrase;
+    } else if (process.env.SSH_AUTH_SOCK) {
+      // use OS ssh-agent if available
+      conn.agent = process.env.SSH_AUTH_SOCK;
+    }
+    if (effectivePassword) conn.password = effectivePassword;
+
+    logd('connecting', `${conn.username}@${conn.host} (hasPassword=${!!effectivePassword}, hasKey=${!!conn.privateKey}, agent=${!!conn.agent})`);
+    await ssh.connect(conn);
 
     // Ensure tmp dir
     await ssh.execCommand('mkdir -p ~/pi-agent-tmp');
+
     // Upload bundle dir
     logd('uploading from', bundlePath);
-    await ssh.putDirectory(bundlePath, `/home/${user}/pi-agent-tmp`, { recursive: true, concurrency: 5 });
+    await ssh.putDirectory(bundlePath, `/home/${loginUser}/pi-agent-tmp`, { recursive: true, concurrency: 5 });
 
     // Prepare /etc/pi-agent/agent.env with invite + server (newline-safe)
     logd('writing env');
@@ -159,7 +205,7 @@ ipcMain.handle('deploy:run', async (_evt, params) => {
       logd('backend preflight', url, '->', r && r.status);
     } catch {}
 
-    // Run installer
+    // Run installer (stop old service first so we don't keep stale creds)
     logd('installing agent');
     await ssh.execCommand('sudo systemctl stop device-agent || true');
     const { stdout, stderr } = await ssh.execCommand('cd ~/pi-agent-tmp && sudo bash ./install.sh');

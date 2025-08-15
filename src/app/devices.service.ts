@@ -26,7 +26,7 @@ export class DevicesService {
     return this.http.post<{commandId:string; status:string}>(`${API}/api/devices/${id}/commands`, { type, payload });
   }
 
-  startReport(id: string, periodSeconds = 60) {
+  startReport(id: string, periodSeconds = 30) {
     return this.command(id, 'start_report', { periodSeconds });
   }
 
